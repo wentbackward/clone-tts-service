@@ -1,0 +1,29 @@
+services:
+  voice:
+    image: ghcr.io/wentbackward/clone-tts-service:cuda
+    build:
+      context: .
+      args:
+        BASE_IMAGE: pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+    container_name: clone-voice
+    ports:
+      - "${VOICE_PORT:-3030}:3030"
+    volumes:
+      - ./voices:/app/voices
+      - ./config.yaml:/app/config.yaml
+      - hf-cache:/root/.cache/huggingface
+      - whisper-cache:/root/.cache/whisper
+    environment:
+      - VOICE_CONFIG=/app/config.yaml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  hf-cache:
+  whisper-cache:

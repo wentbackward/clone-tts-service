@@ -1,0 +1,25 @@
+host: "0.0.0.0"
+port: 3030
+
+# Directory containing voice .wav and .txt files
+voices_dir: "/app/voices"
+
+# Device: "auto" (detect GPU, fall back to CPU), "cuda", or "cpu"
+device: "auto"
+
+# TTS settings
+tts:
+  model: "F5TTS_v1_Base"
+  defaults:
+    quality: "quality"    # "fast" (16 steps) or "quality" (32 steps)
+    format: "ogg"         # "ogg", "flac", or "mp3"
+    speed: 1.0
+    seed: -1              # -1 for random
+    cfg_strength: 2.0
+
+# STT settings
+stt:
+  model: "turbo"          # whisper model: tiny, base, small, medium, large, turbo
+  language: null          # null for auto-detect, or "en", "fr", etc.
+  defaults:
+    format: "json"        # "json", "text", "verbose"
