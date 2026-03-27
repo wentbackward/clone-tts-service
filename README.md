@@ -143,6 +143,7 @@ Tips:
 - 5-15 seconds of clear speech, minimal background noise
 - 24kHz 16-bit mono WAV is ideal (other formats auto-converted)
 - Transcript must match the spoken words exactly
+- Try putting an elipsis at the start and end of the transcription if you find you're getting bleed.
 
 ## Configuration
 
@@ -205,6 +206,11 @@ GPU memory: ~1.2GB (TTS) + ~1.5GB (Whisper turbo). Models load on first use.
   GET /health │  status + device info            │
               └─────────────────────────────────┘
 ```
+
+## Drawbacks
+- Multi-users might not be a good experience. This is a very simple service, locks and queueing are in place as it can only run inference on 1 request at a time. It will handle multiple users / parallel requests but if there's too many simultaneous requests will bog down quickly. Hey! It's free, fire up another docker.
+- It's not real-time performance and it's batch mode, you pass the whole text and wait for the whole sound file.
+- You cannot control inflection, other than through punctuation. You get what you're given from the enginer!
 
 ## License
 
