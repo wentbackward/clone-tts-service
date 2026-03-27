@@ -122,6 +122,37 @@ class TTSRequest(BaseModel):
     cfg_strength: float | None = Field(default=None, ge=0.1, le=5.0)
 
 
+def _patch_f5tts_threading():
+    """Disable F5-TTS internal ThreadPoolExecutor to prevent cache corruption.
+
+    F5-TTS splits long text into batches and processes them concurrently via
+    ThreadPoolExecutor. The DiT transformer caches text embeddings as instance
+    variables, so concurrent batch processing corrupts the cache causing
+    "Sizes of tensors must match" errors. This patch forces sequential processing.
+    """
+    import f5_tts.infer.utils_infer as f5_utils
+    from concurrent.futures import ThreadPoolExecutor
+
+    class _SequentialExecutor:
+        """Drop-in replacement that runs submissions sequentially."""
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def submit(self, fn, *args, **kwargs):
+            from concurrent.futures import Future
+            f = Future()
+            try:
+                f.set_result(fn(*args, **kwargs))
+            except Exception as e:
+                f.set_exception(e)
+            return f
+
+    f5_utils.ThreadPoolExecutor = _SequentialExecutor
+
+_patch_f5tts_threading()
+
+
 def generate_audio(text, ref_file, ref_text, nfe_step=32,
                    cfg_strength=2.0, speed=1.0, seed=None):
     with _tts_infer_lock:
@@ -136,8 +167,6 @@ def generate_audio(text, ref_file, ref_text, nfe_step=32,
             seed=seed if seed and seed >= 0 else None,
             show_info=lambda x: None,
         )
-        if hasattr(model, 'ema_model') and hasattr(model.ema_model, 'transformer'):
-            model.ema_model.transformer.clear_cache()
         return wav, sr
 
 
