@@ -46,13 +46,29 @@ docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
 
 | Tag | Platform | GPU | Use case |
 |-----|----------|-----|----------|
-| `ghcr.io/wentbackward/clone-tts-service:cuda` | amd64, arm64 | NVIDIA CUDA | Desktops, servers, DGX |
+| `ghcr.io/wentbackward/clone-tts-service:cuda` | amd64 | NVIDIA CUDA | Desktops, servers, WSL |
 | `ghcr.io/wentbackward/clone-tts-service:cpu` | amd64, arm64 | None | Raspberry Pi, any system |
-| `ghcr.io/wentbackward/clone-tts-service:cuda-amd64` | amd64 | NVIDIA CUDA | x86 laptops, WSL |
-| `ghcr.io/wentbackward/clone-tts-service:cuda-arm64` | arm64 | NVIDIA CUDA | DGX Spark, Jetson |
 | `ghcr.io/wentbackward/clone-tts-service:cpu-arm64` | arm64 | None | Raspberry Pi |
+| `ghcr.io/wentbackward/clone-tts-service:cpu-amd64` | amd64 | None | x86 without GPU |
+
+For **NVIDIA arm64** (DGX Spark, Jetson): build locally with `Dockerfile.spark` — see [ARM64 CUDA](#arm64-cuda-dgx-spark-jetson) below.
 
 Also available on Docker Hub: `wentbackward/clone-tts-service`
+
+### ARM64 CUDA (DGX Spark, Jetson)
+
+PyTorch CUDA images are x86-only, so arm64 CUDA builds must be done locally using `Dockerfile.spark`:
+
+```bash
+docker build -f Dockerfile.spark -t clone-voice:spark .
+docker run --rm -d --runtime nvidia --gpus all \
+  --name clone-voice --network host \
+  -v ./voices:/app/voices \
+  -v ./config.yaml:/app/config.yaml \
+  -v hf-cache:/root/.cache/huggingface \
+  -v whisper-cache:/root/.cache/whisper \
+  clone-voice:spark
+```
 
 ## Usage
 
@@ -77,6 +93,26 @@ curl -X POST http://localhost:3030/stt \
 
 ```bash
 curl http://localhost:3030/voices
+```
+
+### OpenAI-Compatible TTS
+
+Drop-in replacement for the OpenAI TTS API — works with any client that supports a custom base URL:
+
+```bash
+curl -X POST http://localhost:3030/v1/audio/speech \
+  -H 'Content-Type: application/json' \
+  -d '{"model": "tts-1", "input": "Hello!", "voice": "paul"}' \
+  -o output.opus
+```
+
+**OpenClaw config:**
+```json
+"openai": {
+  "baseUrl": "http://spark-01:3030/v1",
+  "apiKey": "not-needed",
+  "model": "tts-1"
+}
 ```
 
 See [SKILL.md](SKILL.md) for the full API reference.

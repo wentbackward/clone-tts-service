@@ -2,8 +2,9 @@
 """
 Clone Voice Service — TTS (F5-TTS) + STT (Whisper) in a single API.
 
-  POST /tts  — text + voice → audio
-  POST /stt  — audio → text
+  POST /tts               — text + voice → audio
+  POST /v1/audio/speech   — OpenAI-compatible TTS endpoint
+  POST /stt               — audio → text
   GET  /voices
   GET  /health
 """
@@ -21,6 +22,7 @@ import torch
 import yaml
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response, JSONResponse
+from typing import Optional
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -192,6 +194,61 @@ async def text_to_speech(req: TTSRequest):
         raise HTTPException(500, f"TTS failed: {str(e)}")
 
     audio_bytes, mime = wav_to_format(wav, sr, fmt)
+    return Response(content=audio_bytes, media_type=mime)
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible TTS  (POST /v1/audio/speech)
+# ---------------------------------------------------------------------------
+class OpenAISpeechRequest(BaseModel):
+    model: str = "tts-1"
+    input: str
+    voice: str = "paul"
+    response_format: Optional[str] = "opus"
+    speed: Optional[float] = 1.0
+
+
+OPENAI_FMT_MAP = {
+    "mp3": "mp3",
+    "opus": "ogg",
+    "aac": "mp3",   # ffmpeg can produce aac but we map to mp3 for simplicity
+    "flac": "flac",
+    "wav": "flac",   # serve lossless
+    "pcm": "flac",
+}
+
+OPENAI_MIME_MAP = {
+    "mp3": "audio/mpeg",
+    "opus": "audio/ogg",
+    "aac": "audio/mpeg",
+    "flac": "audio/flac",
+    "wav": "audio/flac",
+    "pcm": "audio/flac",
+}
+
+
+@app.post("/v1/audio/speech", response_class=Response)
+async def openai_tts(req: OpenAISpeechRequest):
+    import asyncio
+
+    voices = discover_voices()
+    if req.voice not in voices:
+        raise HTTPException(404, f"Voice not found: {req.voice}. Available: {', '.join(voices.keys())}")
+
+    v = voices[req.voice]
+    fmt = OPENAI_FMT_MAP.get(req.response_format, "ogg")
+    mime = OPENAI_MIME_MAP.get(req.response_format, "audio/ogg")
+    speed = req.speed or 1.0
+
+    try:
+        wav, sr = await asyncio.to_thread(
+            generate_audio, req.input, v["file"], v["transcript"],
+            16, 2.0, speed, None,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"TTS failed: {str(e)}")
+
+    audio_bytes, _ = wav_to_format(wav, sr, fmt)
     return Response(content=audio_bytes, media_type=mime)
 
 

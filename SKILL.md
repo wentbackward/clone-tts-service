@@ -55,6 +55,33 @@ GET http://spark-01:3030/voices
 
 Fetch available voices before generating audio. Returns JSON keyed by voice name.
 
+### OpenAI-Compatible TTS
+
+```
+POST http://spark-01:3030/v1/audio/speech
+Content-Type: application/json
+```
+
+```json
+{
+  "model": "tts-1",
+  "input": "The text you want spoken.",
+  "voice": "paul",
+  "response_format": "opus",
+  "speed": 1.0
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `model` | string | `"tts-1"` | Accepted but ignored (always uses F5-TTS) |
+| `input` | string | *required* | Text to speak |
+| `voice` | string | `"paul"` | Voice profile name |
+| `response_format` | string | `"opus"` | `"opus"`, `"mp3"`, `"flac"`, `"wav"`, `"aac"`, `"pcm"` |
+| `speed` | float | `1.0` | Playback speed |
+
+Returns audio binary data. Compatible with any OpenAI TTS client — set `baseUrl` to `http://spark-01:3030/v1`.
+
 ### Health Check
 
 ```
