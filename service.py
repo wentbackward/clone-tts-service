@@ -122,17 +122,18 @@ class TTSRequest(BaseModel):
     cfg_strength: float | None = Field(default=None, ge=0.1, le=5.0)
 
 
-def _patch_f5tts_threading():
-    """Disable F5-TTS internal ThreadPoolExecutor to prevent cache corruption.
+def _patch_f5tts():
+    """Patch F5-TTS internals for stability.
 
-    F5-TTS splits long text into batches and processes them concurrently via
-    ThreadPoolExecutor. The DiT transformer caches text embeddings as instance
-    variables, so concurrent batch processing corrupts the cache causing
-    "Sizes of tensors must match" errors. This patch forces sequential processing.
+    1. Disable internal ThreadPoolExecutor — the DiT transformer caches text
+       embeddings as instance variables, so concurrent batch processing
+       corrupts the cache causing "Sizes of tensors must match" errors.
+    2. Enforce a minimum generation duration — short texts get allocated too
+       few frames, causing truncated audio output.
     """
     import f5_tts.infer.utils_infer as f5_utils
-    from concurrent.futures import ThreadPoolExecutor
 
+    # --- Patch 1: Sequential executor ---
     class _SequentialExecutor:
         """Drop-in replacement that runs submissions sequentially."""
         def __enter__(self):
@@ -150,7 +151,22 @@ def _patch_f5tts_threading():
 
     f5_utils.ThreadPoolExecutor = _SequentialExecutor
 
-_patch_f5tts_threading()
+    # --- Patch 2: Minimum generation duration ---
+    _orig_infer_batch = f5_utils.infer_batch_process
+
+    def _patched_infer_batch(*args, speed=1, **kwargs):
+        # Slow down short texts so they aren't truncated.
+        # F5-TTS already does speed=0.3 for <10 bytes but that's not enough.
+        # We cap speed at 0.5 for anything under 100 bytes.
+        gen_text_batches = args[2] if len(args) > 2 else kwargs.get('gen_text_batches', [])
+        total_bytes = sum(len(t.encode('utf-8')) for t in gen_text_batches)
+        if total_bytes < 100:
+            speed = min(speed, 0.5)
+        return _orig_infer_batch(*args, speed=speed, **kwargs)
+
+    f5_utils.infer_batch_process = _patched_infer_batch
+
+_patch_f5tts()
 
 
 def generate_audio(text, ref_file, ref_text, nfe_step=32,
