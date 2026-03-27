@@ -7,6 +7,9 @@ voices_dir: "/app/voices"
 # Device: "auto" (detect GPU, fall back to CPU), "cuda", or "cpu"
 device: "auto"
 
+# Logging: DEBUG, INFO, WARNING, ERROR
+log_level: "INFO"
+
 # TTS settings
 tts:
   model: "F5TTS_v1_Base"

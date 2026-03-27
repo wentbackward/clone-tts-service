@@ -10,6 +10,7 @@ Clone Voice Service — TTS (F5-TTS) + STT (Whisper) in a single API.
 """
 
 import io
+import logging
 import os
 import tempfile
 import subprocess
@@ -35,6 +36,9 @@ with open(CONFIG_PATH) as f:
 VOICES_DIR = Path(CONFIG["voices_dir"])
 TTS_DEFAULTS = CONFIG.get("tts", {}).get("defaults", {})
 STT_DEFAULTS = CONFIG.get("stt", {}).get("defaults", {})
+
+log = logging.getLogger("voice-service")
+logging.basicConfig(level=getattr(logging, CONFIG.get("log_level", "INFO").upper(), logging.INFO))
 
 
 def detect_device() -> str:
@@ -282,12 +286,15 @@ async def openai_tts(req: OpenAISpeechRequest):
     import asyncio
 
     voices = discover_voices()
-    if req.voice in voices:
-        v = voices[req.voice]
+    matched = req.voice if req.voice in voices else None
+    if matched:
+        v = voices[matched]
     elif voices:
-        v = next(iter(voices.values()))
+        matched = next(iter(voices))
+        v = voices[matched]
     else:
         raise HTTPException(500, "No voices configured")
+    log.info(f"openai-tts voice={req.voice!r} → {matched!r}, fmt={req.response_format!r}, len={len(req.input)}")
 
     fmt = OPENAI_FMT_MAP.get(req.response_format, "ogg")
     mime = OPENAI_MIME_MAP.get(req.response_format, "audio/ogg")
