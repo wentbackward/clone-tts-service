@@ -60,6 +60,7 @@ _tts_infer_lock = threading.Lock()  # serialize inference — F5-TTS is not thre
 
 _stt_model = None
 _stt_lock = threading.Lock()
+_stt_infer_lock = threading.Lock()  # serialize inference — Whisper is not thread-safe
 
 
 def get_tts_model():
@@ -337,11 +338,12 @@ async def speech_to_text(
 
     try:
         def _transcribe():
-            model = get_stt_model()
-            opts = {}
-            if lang:
-                opts["language"] = lang
-            return model.transcribe(tmp_path, **opts)
+            with _stt_infer_lock:
+                model = get_stt_model()
+                opts = {}
+                if lang:
+                    opts["language"] = lang
+                return model.transcribe(tmp_path, **opts)
 
         result = await asyncio.to_thread(_transcribe)
     finally:
