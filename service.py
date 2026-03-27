@@ -123,18 +123,32 @@ class TTSRequest(BaseModel):
 
 def generate_audio(text, ref_file, ref_text, nfe_step=32,
                    cfg_strength=2.0, speed=1.0, seed=None):
-    model = get_tts_model()
-    wav, sr, _ = model.infer(
-        ref_file=ref_file,
-        ref_text=ref_text,
-        gen_text=text,
-        nfe_step=nfe_step,
-        cfg_strength=cfg_strength,
-        speed=speed,
-        seed=seed if seed and seed >= 0 else None,
-        show_info=lambda x: None,
-    )
-    return wav, sr
+    global _tts_model
+    last_err = None
+    for attempt in range(3):
+        try:
+            model = get_tts_model()
+            wav, sr, _ = model.infer(
+                ref_file=ref_file,
+                ref_text=ref_text,
+                gen_text=text,
+                nfe_step=nfe_step,
+                cfg_strength=cfg_strength,
+                speed=speed,
+                seed=seed if seed and seed >= 0 else None,
+                show_info=lambda x: None,
+            )
+            return wav, sr
+        except RuntimeError as e:
+            last_err = e
+            if "Sizes of tensors must match" in str(e):
+                # F5-TTS internal state corruption — reload model
+                with _tts_lock:
+                    _tts_model = None
+                    torch.cuda.empty_cache()
+                continue
+            raise
+    raise last_err
 
 
 def wav_to_format(wav, sr, fmt):
