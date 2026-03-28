@@ -144,6 +144,7 @@ Tips:
 - 24kHz 16-bit mono WAV is ideal (other formats auto-converted)
 - Transcript must match the spoken words exactly
 - Try putting an elipsis at the start and end of the transcription if you find you're getting bleed.
+- The generated speech speed matches the reference audio's natural pace. For faster or slower output, speed up or slow down the reference WAV file itself.
 
 ## Configuration
 
