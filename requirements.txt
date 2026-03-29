@@ -5,5 +5,5 @@ numpy
 soundfile
 pyyaml
 python-multipart
-f5-tts>=1.0.0
+f5-tts>=1.1.0
 openai-whisper
