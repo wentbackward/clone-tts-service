@@ -280,10 +280,11 @@ def _patch_f5tts():
                 if fix_duration is not None:
                     duration = int(fix_duration * mod.target_sample_rate / hop_length)
                 else:
-                    ref_text_len = len(ref_text.encode("utf-8"))
-                    gen_text_len = len(gen_text.encode("utf-8"))
-                    # Always use caller's speed — no override for short texts
-                    duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / speed)
+                    # Use word count for duration — byte length is unreliable
+                    # for text containing code, URLs, JSON, or punctuation
+                    ref_words = max(len(ref_text.split()), 1)
+                    gen_words = max(len(gen_text.split()), 1)
+                    duration = ref_audio_len + int(ref_audio_len / ref_words * gen_words / speed)
                     # Minimum 1.5s of generated audio to prevent truncation
                     min_gen_frames = int(1.5 * mod.target_sample_rate / hop_length)
                     if (duration - ref_audio_len) < min_gen_frames:
